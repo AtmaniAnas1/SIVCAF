@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SIVCAF">
+  <defs>
+    <linearGradient id="sv-g" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="sv-faisceau" x1="12" y1="0" x2="52" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="sv-lueur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="f"/>
+      <feMerge><feMergeNode in="f"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Hexagone : cadre de l'analyse -->
+  <path d="M32 3.5 56.7 17.75v28.5L32 60.5 7.3 46.25v-28.5Z" fill="#0b1224" stroke="url(#sv-g)" stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Nœuds du réseau de neurones -->
+  <g fill="url(#sv-g)">
+    <circle cx="32" cy="3.5" r="2.2"/><circle cx="56.7" cy="17.75" r="2.2"/><circle cx="7.3" cy="46.25" r="2.2"/>
+  </g>
+  <!-- Document -->
+  <path d="M21.5 15.5h13.5l6.5 6.5v26.5h-20Z" fill="#111a33" stroke="#e2e8f0" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M35 15.5v6.5h6.5" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-linejoin="round"/>
+  <g stroke="#64748b" stroke-width="2" stroke-linecap="round">
+    <path d="M25.5 27h11"/><path d="M25.5 37h8"/><path d="M25.5 42h6"/>
+  </g>
+  <!-- Faisceau de scan -->
+  <rect x="13" y="30.6" width="38" height="2.8" rx="1.4" fill="url(#sv-faisceau)" filter="url(#sv-lueur)"/>
+  <!-- Validation -->
+  <circle cx="44.5" cy="45" r="7.5" fill="url(#sv-g)"/>
+  <path d="m40.8 45.2 2.6 2.6 4.8-5.3" fill="none" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

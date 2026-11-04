@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block titre %}Facture #{{ f.id }}{% endblock %}
+{% macro jauge(p, lib, detail) -%}
+  {% set c = 213.63 %}
+  <div class="jauge">
+    <svg viewBox="0 0 80 80" aria-hidden="true">
+      <circle class="piste" cx="40" cy="40" r="34" fill="none" stroke-width="7"/>
+      <circle class="arc" cx="40" cy="40" r="34" fill="none" stroke-width="7"
+              stroke-dasharray="{{ p * c }} {{ c }}"/>
+    </svg>
+    <div>
+      <div class="lib">{{ lib }}</div>
+      <div class="valeur-jauge">{{ '%.0f'|format(p * 100) }} %</div>
+      <div class="det">{{ detail }}</div>
+    </div>
+  </div>
+{%- endmacro %}
+{% macro barres(probas, libelles) -%}
+  <div class="probas">
+    {% for code, p in probas|dictsort(by='value', reverse=true) %}
+    <div class="proba {{ 'top' if loop.first }}">
+      <span>{{ libelles.get(code, code) }}</span><span class="p">{{ '%.0f'|format(p * 100) }} %</span>
+      <div class="rep-barre"><span style="width:{{ p * 100 }}%"></span></div>
+    </div>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+{% block contenu %}
+<div class="entete-page">
+  <div>
+    <div class="surtitre">// Document #{{ f.id }} · importé le {{ f.date_import }}</div>
+    <h1>{{ f.emetteur or f.fichier_original }}</h1>
+  </div>
+  <a href="{{ url_for('accueil') }}#documents" class="btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    Retour
+  </a>
+</div>
+
+<div class="grille fiche">
+  <div class="panneau visionneuse">
+    <div class="cadre">
+      <i class="coin hg"></i><i class="coin hd"></i><i class="coin bg"></i><i class="coin bd"></i>
+      {% if f.chemin_stocke.endswith('.pdf') %}
+        <embed src="{{ url_for('fichier', nom=f.chemin_stocke) }}" type="application/pdf">
+      {% else %}
+        <img src="{{ url_for('fichier', nom=f.chemin_stocke) }}" alt="Document {{ f.fichier_original }}">
+      {% endif %}
+    </div>
+    <div class="legende-visio"><span>{{ f.fichier_original }}</span><span>{{ f.duree_ms }} ms</span></div>
+  </div>
+
+  <div class="grille">
+    <div class="panneau verdict {{ f.decision }}">
+      <span class="pastille {{ f.decision }}">{{ DECISIONS.get(f.decision, f.decision) }}</span>
+      <div class="decision">{{ f.file_traitement }}</div>
+      <div class="file-trait petit">Statut : {{ f.statut }}{% if f.pays %} · {{ PAYS.get(f.pays) }}{% endif %}{% if f.devise %} · {{ f.devise }}{% endif %}</div>
+      <ul class="motifs">{% for m in f.motifs or [] %}<li>{{ m }}</li>{% endfor %}</ul>
+    </div>
+
+    <div class="grille jauges">
+      {{ jauge(f.confiance_type, 'Classification', TYPES.get(f.type_doc, f.type_doc)) }}
+      {{ jauge(f.probas.qualite.get('conforme', 0), 'Qualité image', QUALITES.get(f.qualite, f.qualite)) }}
+    </div>
+
+    <div class="panneau">
+      <h2>Analyse du type</h2>
+      {% if f.probas.type_cnn %}
+      {% set tc = f.probas.type_cnn %}{% set tt = f.probas.type_texte %}
+      <div class="puces" style="margin:0 0 14px">
+        <span class="puce">Image (CNN) <b>{{ TYPES.get(tc|dictsort(by='value')|last|first) }} · {{ '%.0f'|format((tc|dictsort(by='value')|last|last) * 100) }} %</b></span>
+        <span class="puce">Texte OCR <b>{% if tt %}{{ TYPES.get(tt|dictsort(by='value')|last|first) }} · {{ '%.0f'|format((tt|dictsort(by='value')|last|last) * 100) }} %{% else %}aucun indice{% endif %}</b></span>
+      </div>
+      {% endif %}
+      <div class="grille" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:22px">
+        <div><div class="doux petit mono" style="margin-bottom:8px">TYPE · FUSION</div>{{ barres(f.probas.type, TYPES) }}</div>
+        <div><div class="doux petit mono" style="margin-bottom:8px">QUALITÉ · CNN</div>{{ barres(f.probas.qualite, QUALITES) }}</div>
+      </div>
+    </div>
+
+    <div class="panneau">
+      {% set m = f.mesures_qualite %}
+      <h2>Contrôle optique <span class="compteur">{{ m.mode }}</span></h2>
+      <div class="grille tuiles">
+        <div class="tuile"><div class="lib">Netteté</div><div class="v">{{ '%.0f'|format(m.nettete) }}</div></div>
+        <div class="tuile"><div class="lib">Luminosité</div><div class="v">{{ '%.0f'|format(m.luminosite) }}</div></div>
+        <div class="tuile"><div class="lib">Contraste</div><div class="v">{{ '%.0f'|format(m.contraste) }}</div></div>
+        <div class="tuile"><div class="lib">Surface</div><div class="v">{{ '%.0f'|format(m.surface_document * 100) }} %</div></div>
+        <div class="tuile"><div class="lib">Inclinaison</div><div class="v">{{ m.inclinaison }}°</div></div>
+        <div class="tuile {{ 'alerte-on' if m.alertes }}"><div class="lib">Alertes</div><div class="v">{{ m.alertes|length }}</div></div>
+      </div>
+      {% if m.alertes %}<ul class="motifs">{% for a in m.alertes %}<li>{{ a }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+
+    <form class="panneau" method="post">
+      <h2>Données extraites <span class="compteur">{{ f.moteur_ocr or 'OCR non exécuté' }}</span></h2>
+      {% if f.anomalies %}<div class="alerte">⚠ {{ f.anomalies|join(' · ') }}</div>{% endif %}
+      <div class="champs">
+        <div class="champ">
+          <label for="type_doc">Type</label>
+          <select name="type_doc" id="type_doc">
+            {% for code, lib in TYPES.items() %}<option value="{{ code }}" {% if f.type_doc == code %}selected{% endif %}>{{ lib }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="champ">
+          <label for="pays">Pays</label>
+          <select name="pays" id="pays">
+            <option value="">— non détecté —</option>
+            {% for code, nom in PAYS.items() %}<option value="{{ code }}" {% if f.pays == code %}selected{% endif %}>{{ nom }}</option>{% endfor %}
+          </select>
+        </div>
+        {% for champ, lib, classe in [('numero', 'N° de facture', ''), ('date_facture', 'Date (AAAA-MM-JJ)', ''),
+                                      ('emetteur', 'Émetteur', ''), ('devise', 'Devise', ''),
+                                      ('siret', 'Identifiant fiscal', ''), ('tva_intracom', 'TVA intracom.', ''),
+                                      ('iban', 'IBAN / RIB', 'large'),
+                                      ('montant_ht', 'Montant HT', 'm'), ('taux_tva', 'Taux TVA (%)', 'm'),
+                                      ('montant_tva', 'TVA / taxes', 'm'), ('montant_ttc', 'Montant facture (TTC)', 'm'),
+                                      ('net_a_payer', 'Net à payer', 'm')] %}
+        <div class="champ {{ 'large' if classe == 'large' }}">
+          <label for="{{ champ }}">{{ lib }}</label>
+          <input name="{{ champ }}" id="{{ champ }}" class="{{ 'montant-champ' if classe == 'm' }}"
+                 value="{{ f[champ] if f[champ] is not none else '' }}">
+        </div>
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <button class="btn ok" name="action" value="valider">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Valider et orienter
+        </button>
+        <button class="btn" name="action" value="enregistrer">Enregistrer</button>
+        <button class="btn" name="action" value="traiter">Marquer traitée</button>
+        <button class="btn ko" name="action" value="rejeter">Rejeter</button>
+      </div>
+    </form>
+
+    {% if f.texte_ocr %}
+    <div class="panneau">
+      <h2>Texte reconnu</h2>
+      <pre class="terminal">{{ f.texte_ocr }}</pre>
+    </div>
+    {% endif %}
+
+    <div class="actions" style="margin-top:0">
+      <form method="post" action="{{ url_for('reanalyser', id_=f.id) }}"
+            onsubmit="this.querySelector('button').lastChild.textContent = ' Réanalyse en cours…'">
+        <button class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          Réanalyser
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('supprimer', id_=f.id) }}" onsubmit="return confirm('Supprimer ce document ?')">
+        <button class="btn ko">Supprimer</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

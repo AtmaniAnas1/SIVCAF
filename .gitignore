@@ -1,0 +1,17 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Données générées ou personnelles (régénérables via `python -m sivcaf preparer` / `exemples`)
+data/dataset/
+data/exemples/
+data/uploads/
+data/*.db
+data/*.log
+
+# Éditeurs et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

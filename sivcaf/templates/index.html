@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block titre %}Centre de contrôle{% endblock %}
+{% block contenu %}
+<div class="entete-page">
+  <div>
+    <div class="surtitre">// Centre de contrôle</div>
+    <h1>Vérification &amp; classement des factures</h1>
+  </div>
+  <div class="horloge" id="horloge"></div>
+</div>
+
+<div class="grille kpis">
+  <div class="panneau kpi">
+    <div class="lib">Documents</div>
+    <div class="val">{{ stats.total }}</div>
+    <div class="sous">analysés au total</div>
+  </div>
+  {% for code, lib in DECISIONS.items() %}
+  {% set n = stats.par_decision.get(code, 0) %}
+  <a class="panneau kpi {{ code }}" href="{{ url_for('accueil', decision=code) }}#documents" style="color:inherit">
+    <div class="lib">{{ lib }}</div>
+    <div class="val">{{ n }}</div>
+    <div class="sous">{{ '%.0f'|format(n / stats.total * 100) if stats.total else 0 }} % du volume</div>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="grille duo">
+  <form class="panneau depot" id="depot" action="{{ url_for('analyser') }}" method="post" enctype="multipart/form-data">
+    <i class="coin hg"></i><i class="coin hd"></i><i class="coin bg"></i><i class="coin bd"></i>
+    <div class="faisceau"></div>
+    <input type="file" name="fichiers" id="fichiers" multiple accept="image/*,.pdf" hidden>
+    <svg class="icone-depot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/>
+    </svg>
+    <strong>Déposez vos factures pour analyse</strong>
+    <div class="doux petit">Glissez-déposez ou cliquez · plusieurs fichiers acceptés</div>
+    <div class="formats">JPG · PNG · TIFF · WEBP · PDF</div>
+    <div id="journal" style="width:100%"></div>
+  </form>
+
+  <div class="panneau">
+    <h2>Répartition par type</h2>
+    <div class="repartition">
+      {% set maxi = (stats.par_type.values()|max) if stats.par_type else 1 %}
+      {% for code, n in stats.par_type.items() %}
+      <div class="rep-ligne">
+        <span>{{ TYPES.get(code, code) }}</span><span class="n">{{ n }}</span>
+        <div class="rep-barre"><span style="width:{{ n / maxi * 100 }}%"></span></div>
+      </div>
+      {% else %}<div class="doux petit">Aucune donnée pour l'instant.</div>{% endfor %}
+    </div>
+    {% if stats.par_pays %}
+    <h2 style="margin-top:18px">Pays détectés</h2>
+    <div class="puces">
+      {% for code, n in stats.par_pays.items() %}<span class="puce">{{ PAYS.get(code, 'Non détecté') }} <b>{{ n }}</b></span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if stats.montant_valide %}
+    <div class="montants">
+      <div class="lib doux petit mono" style="letter-spacing:1px">MONTANTS VALIDÉS</div>
+      {% for devise, total in stats.montant_valide.items() %}
+      <div class="m"><span>{{ devise or 'Devise inconnue' }}</span><b>{{ total|montant(devise) }}</b></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panneau" id="documents">
+  <form class="barre-filtres" method="get" action="#documents">
+    <h2>Documents <span class="compteur">{{ factures|length }}</span></h2>
+    <select name="decision" onchange="this.form.submit()" aria-label="Décision">
+      <option value="">Toutes décisions</option>
+      {% for code, lib in DECISIONS.items() %}<option value="{{ code }}" {% if filtres.decision == code %}selected{% endif %}>{{ lib }}</option>{% endfor %}
+    </select>
+    <select name="type_doc" onchange="this.form.submit()" aria-label="Type">
+      <option value="">Tous types</option>
+      {% for code, lib in TYPES.items() %}<option value="{{ code }}" {% if filtres.type_doc == code %}selected{% endif %}>{{ lib }}</option>{% endfor %}
+    </select>
+    <input name="recherche" placeholder="Fichier, n°, émetteur…" value="{{ filtres.recherche or '' }}" aria-label="Recherche">
+    <button class="btn">Filtrer</button>
+  </form>
+  <div class="tableau">
+  <table>
+    <thead><tr>
+      <th>Document</th><th>Type · pays</th><th>Décision</th><th class="masquer-mobile">File de traitement</th><th class="masquer-mobile">N° facture</th>
+      <th class="masquer-mobile">Date</th><th class="num">Montant</th>
+    </tr></thead>
+    <tbody>
+    {% for f in factures %}
+      <tr class="lien" onclick="location.href='{{ url_for('detail', id_=f.id) }}'">
+        <td>
+          <div class="doc-cell">
+            {% if not f.chemin_stocke.endswith('.pdf') %}
+            <img class="vignette" src="{{ url_for('fichier', nom=f.chemin_stocke) }}" alt="" loading="lazy">
+            {% endif %}
+            <div style="min-width:0">
+              <div class="titre-doc">{{ f.emetteur or f.fichier_original }}</div>
+              <div class="confiance">#{{ f.id }} · {{ f.fichier_original[:34] }}</div>
+            </div>
+          </div>
+        </td>
+        <td>{{ TYPES.get(f.type_doc, f.type_doc).split(' (')[0] }}
+          <div class="confiance">{{ '%.0f'|format(f.confiance_type * 100) }} %{% if f.pays %} · {{ PAYS.get(f.pays) }}{% endif %}</div></td>
+        <td><span class="pastille {{ f.decision }}">{{ DECISIONS.get(f.decision, f.decision) }}</span>
+          <div class="confiance" style="margin-top:4px">{{ QUALITES.get(f.qualite, f.qualite) }}</div></td>
+        <td class="masquer-mobile petit doux col-file">{{ f.file_traitement }}</td>
+        <td class="masquer-mobile mono petit">{{ f.numero or '—' }}</td>
+        <td class="masquer-mobile mono petit">{{ f.date_facture or '—' }}</td>
+        <td class="num">{{ f.montant_ttc|montant(f.devise) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="vide">Aucun document. Déposez une première facture ci-dessus.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<script>
+const depot = document.getElementById('depot'), champ = document.getElementById('fichiers'),
+      journal = document.getElementById('journal');
+const libelles = {{ DECISIONS|tojson }};
+depot.addEventListener('click', e => { if (!e.target.closest('a, button')) champ.click(); });
+['dragenter', 'dragover'].forEach(ev => depot.addEventListener(ev, e => { e.preventDefault(); depot.classList.add('survol'); }));
+['dragleave', 'drop'].forEach(ev => depot.addEventListener(ev, e => { e.preventDefault(); depot.classList.remove('survol'); }));
+depot.addEventListener('drop', e => envoyer(e.dataTransfer.files));
+champ.addEventListener('change', () => { envoyer(champ.files); champ.value = ''; });
+
+function ligne(nom) {
+  const el = document.createElement('div');
+  el.className = 'trace';
+  el.innerHTML = '<span class="rotor"></span><span class="nom-fichier"></span><span class="file">analyse en cours…</span>';
+  el.querySelector('.nom-fichier').textContent = nom;
+  journal.appendChild(el);
+  return el;
+}
+
+async function envoyer(fichiers) {
+  if (!fichiers.length) return;
+  for (const f of fichiers) {
+    const el = ligne(f.name);
+    const donnees = new FormData();
+    donnees.append('fichiers', f);
+    try {
+      const [r] = await (await fetch('{{ url_for("api_analyser") }}', { method: 'POST', body: donnees })).json();
+      el.querySelector('.rotor').remove();
+      const etat = el.querySelector('.file');
+      if (r.erreur) { etat.textContent = '⚠ ' + r.erreur; continue; }
+      const nom = el.querySelector('.nom-fichier');
+      const a = document.createElement('a');
+      a.href = `/facture/${r.id}`; a.textContent = f.name;
+      nom.textContent = ''; nom.appendChild(a);
+      const p = document.createElement('span');
+      p.className = `pastille ${r.decision}`; p.textContent = libelles[r.decision];
+      etat.textContent = r.file_traitement;
+      el.insertBefore(p, etat);
+    } catch (err) { el.querySelector('.file').textContent = '⚠ ' + err; }
+  }
+  if (!journal.querySelector('.maj')) {
+    const b = document.createElement('a');
+    b.className = 'btn primaire maj'; b.href = location.pathname + '#documents'; b.textContent = 'Mettre à jour le tableau';
+    b.style.alignSelf = 'center';
+    b.addEventListener('click', e => { e.preventDefault(); location.reload(); });
+    journal.appendChild(b);
+  }
+}
+</script>
+{% endblock %}
